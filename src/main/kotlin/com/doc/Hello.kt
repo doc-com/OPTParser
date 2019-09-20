@@ -1,18 +1,33 @@
 package com.doc
 
+import com.doc.Constants.Companion.typeValuesMap
+import com.doc.uimodel.UITemplate
 import openEHR.v1.template.COMPOSITION
+import org.apache.xmlbeans.SimpleValue
 import org.openehr.schemas.v1.*
-import org.openehr.schemas.v1.impl.CMULTIPLEATTRIBUTEImpl
-import org.openehr.schemas.v1.impl.OPERATIONALTEMPLATEImpl
 import java.io.File
 
-fun main(args: Array<String>) {
+var termDescription = mutableMapOf<String, TermDefinition>()
 
-    val file = File("src/main/resources/actividad_fisica.opt");
-    val base = OPERATIONALTEMPLATE.Factory.parse(file)
-    val baseObject = base.selectChildren("http://schemas.openehr.org/v1", "template")[0]
-    val opt = OPERATIONALTEMPLATE.Factory.parse(baseObject.toString()) as OPERATIONALTEMPLATEImpl
-    findDefinitionElements(opt.definition)
+fun getClassSimpleName(any: Any): String? {
+    return any::class.simpleName
+}
+
+fun getChildType(child: COBJECT): String {
+    return (child.selectAttribute("http://www.w3.org/2001/XMLSchema-instance", "type") as SimpleValue).stringValue
+}
+
+fun main(args: Array<String>) {
+    val file = File("src/main/resources/actividad_fisica.opt")
+    val uiTemplate = UITemplate(file)
+    println(uiTemplate.sections[0].sections[0].sections.size)
+    println(uiTemplate.sections[0].sections[0].controls.size)
+    //val base = OPERATIONALTEMPLATE.Factory.parse(file)
+    //println(file.readText())
+    //val baseObject = base.selectChildren("http://schemas.openehr.org/v1", "template")[0]
+    //val opt = OPERATIONALTEMPLATE.Factory.parse(baseObject.toString()) as OPERATIONALTEMPLATEImpl
+    //findDefinitionElements(opt.definition)
+    //println(TermDefinitionsMapper.mapDefinitions(opt.definition))
 
 }
 
@@ -25,6 +40,64 @@ fun findDefinitionElements(root: CARCHETYPEROOT) {
 }
 
 fun findContentElementsRecursively(content: CMULTIPLEATTRIBUTE) {
-    println(content.childrenArray)
+    content.childrenArray.forEach {
+        processChild(it, "")
+    }
+}
+
+fun processArchetypeRoot(root: CARCHETYPEROOT) {
+
+    root.attributesArray.forEach {
+        processAttribute(it, "")
+    }
+
+}
+
+fun processChild(child: COBJECT, path: String) {
+    val type = getChildType(child)
+    //println("$type -> ${child.rmTypeName}")
+    //println(path)
+    when (type) {
+        typeValuesMap[CARCHETYPEROOT::class.simpleName] -> {
+            processArchetypeRoot(CARCHETYPEROOT.Factory.parse(child.toString()))
+        }
+        typeValuesMap[CCOMPLEXOBJECT::class.simpleName] -> {
+            processComplexObject(CCOMPLEXOBJECT.Factory.parse(child.toString()), path)
+        }
+
+    }
+}
+
+fun processComplexObject(complexObject: CCOMPLEXOBJECT, path: String) {
+    val newPath = if (complexObject.nodeId == "") path else "$path[${complexObject.nodeId}]"
+    if (complexObject.rmTypeName == ELEMENT::class.simpleName) {
+        processElement(complexObject, newPath)
+    } else {
+        complexObject.attributesArray.forEach {
+            processAttribute(it, newPath)
+        }
+    }
+}
+
+fun processAttribute(attribute: CATTRIBUTE, path: String) {
+    attribute.childrenArray.forEach {
+        processChild(it, "$path/${attribute.rmAttributeName}")
+    }
+}
+
+
+fun processElement(element: CCOMPLEXOBJECT, path: String) {
+    if (element.attributesArray.isNotEmpty()) {
+        element.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "value" }
+            ?.let { attr: CATTRIBUTE ->
+                if (attr.childrenArray.isNotEmpty()) {
+                    processDataValue(attr.getChildrenArray(0), "$path/value")
+                }
+            }
+    }
+}
+
+fun processDataValue(dataValue: COBJECT, path: String) {
+    println(dataValue.rmTypeName)
 }
 
