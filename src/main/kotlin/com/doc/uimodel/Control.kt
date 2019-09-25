@@ -17,7 +17,8 @@ class Control private constructor(
     val orderInParent: Int?,
     val termDefinition: TermDefinition?,
     val type: String?,
-    val quantityItems: Array<CQUANTITYITEM>?
+    val quantityItems: List<CQUANTITYITEM>?,
+    val codeList: List<String>?
 ) {
 
     data class Builder(
@@ -26,14 +27,23 @@ class Control private constructor(
         val orderInParent: Int,
         val term: TermDefinition,
         var type: String? = null,
-        var quantityItems: Array<CQUANTITYITEM>? = null
+        var quantityItems: List<CQUANTITYITEM>? = null,
+        var codeList: List<String>? = null
     ) {
 
         fun type(type: String) = apply { this.type = type }
 
         fun quantityItems(quantity: COBJECT) = apply {
             val cdvquantity: CDVQUANTITY = CDVQUANTITY.Factory.parse(quantity.toString())
-            this.quantityItems = cdvquantity.listArray
+            this.quantityItems = cdvquantity.listArray.toList()
+        }
+
+        fun codeList(codeList: Array<String>, termDefinitions: Map<String, TermDefinition>) = apply {
+            val codeValues: MutableList<String> = mutableListOf()
+            codeList.forEach { code: String ->
+                termDefinitions[code]?.let { codeValues.add(it.text) }
+            }
+            this.codeList = codeValues
         }
 
         fun build() = Control(
@@ -46,7 +56,8 @@ class Control private constructor(
             orderInParent,
             term,
             type,
-            quantityItems
+            quantityItems,
+            codeList
         )
     }
 }
