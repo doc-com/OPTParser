@@ -19,10 +19,17 @@ enum class CComplexObjectTypes(val type: String?) {
     CLUSTER(org.openehr.schemas.v1.CLUSTER::class.simpleName),
     ELEMENT(org.openehr.schemas.v1.ELEMENT::class.simpleName),
     C_DV_QUANTITY("C_DV_QUANTITY"),
+    DV_COUNT("DV_COUNT"),
     DV_CODED_TEXT("DV_CODED_TEXT"),
     DV_TEXT("DV_TEXT"),
+    DV_DATE_TIME("DV_DATE_TIME"),
+    C_DV_ORDINAL("C_DV_ORDINAL"),
+    DV_ORDINAL("DV_ORDINAL"),
+    DV_BOOLEAN("DV_BOOLEAN"),
+    DV_DURATION("DV_DURATION"),
     //RM_ATTRIBUTE_NAMES
     DEFINING_CODE("defining_code"),
     VALUE("value"),
     NULL_FLAVOUR("null_flavour")
+
 }

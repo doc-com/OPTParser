@@ -6,8 +6,10 @@ import org.apache.xmlbeans.XmlObject
 import org.openehr.am.archetype.ontology.ConstraintBinding
 import org.openehr.rm.datatypes.text.DvText
 import org.openehr.schemas.v1.*
+import org.openehr.schemas.v1.impl.CDVORDINALImpl
 import org.openehr.schemas.v1.impl.OPERATIONALTEMPLATEImpl
 import java.io.File
+import java.net.URI
 
 class UITemplate(template: File) {
 
@@ -68,7 +70,7 @@ class UITemplate(template: File) {
 
         when (complexObject.rmTypeName) {
             CComplexObjectTypes.COMPOSITION.type -> {
-                val newSection = Section(complexObject, orderInParent)
+                val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val content: CMULTIPLEATTRIBUTE =
                     CMULTIPLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "content" }.toString())
@@ -76,7 +78,7 @@ class UITemplate(template: File) {
             }
 
             CComplexObjectTypes.OBSERVATION.type -> {
-                val newSection = Section(complexObject, orderInParent)
+                val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val data: CATTRIBUTE =
                     CATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "data" }.toString())
@@ -85,24 +87,20 @@ class UITemplate(template: File) {
             }
 
             CComplexObjectTypes.SECTION.type -> {
-                val newSection = Section(complexObject, orderInParent)
+                val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
+
                 val content: CMULTIPLEATTRIBUTE =
                     CMULTIPLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "items" }.toString())
-                processAttribute(content, "", newSection)
+                processAttribute(content, "$path[${complexObject.nodeId}]", newSection)
             }
 
             CComplexObjectTypes.CLUSTER.type -> {
+                val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
+                if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val content: CMULTIPLEATTRIBUTE =
                     CMULTIPLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "items" }.toString())
-                if (getChildType(complexObject) == CComplexObjectTypes.C_ARCHETYPE_ROOT.type) {
-                    val newSection = Section(complexObject, orderInParent)
-                    if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
-                    processAttribute(content, "", newSection)
-                } else {
-                    processAttribute(content, "", currentSection)
-                }
-
+                processAttribute(content, "$path[${complexObject.nodeId}]", newSection)
             }
 
             CComplexObjectTypes.EVALUATION.type -> {
@@ -155,7 +153,7 @@ class UITemplate(template: File) {
     }
 
     private fun processAttribute(attribute: CATTRIBUTE, path: String, section: Section?) {
-        println(attribute.rmAttributeName)
+        //println(attribute.rmAttributeName)
         var orderInParent = 0
         attribute.childrenArray.forEach {
             val complexObject: CCOMPLEXOBJECT = CCOMPLEXOBJECT.Factory.parse(it.toString())
@@ -195,8 +193,8 @@ class UITemplate(template: File) {
         orderInParent: Int,
         section: Section?
     ) {
-        println(dataValue.rmTypeName)
-        println(path)
+        //println(dataValue.rmTypeName)
+        //println(path)
         val controlBuilder = Control.Builder(dataValue, path, orderInParent, section?.getTerm(nodeId, path)!!)
         when (getChildType(dataValue)) {
 
@@ -205,24 +203,79 @@ class UITemplate(template: File) {
                 controlBuilder.quantityItems(dataValue)
             }
 
+            CComplexObjectTypes.C_DV_ORDINAL.type -> {
+                controlBuilder.type(ControlType.ORDINAL.type)
+                controlBuilder.ordinalList(CDVORDINAL.Factory.parse(dataValue.toString()), section.termDefinitions)
+            }
+
+
             CComplexObjectTypes.C_COMPLEX_OBJECT.type -> {
+                val complexObject = CCOMPLEXOBJECT.Factory.parse(dataValue.toString())
                 when (dataValue.rmTypeName) {
                     CComplexObjectTypes.DV_CODED_TEXT.type -> {
-                        val complexObject = CCOMPLEXOBJECT.Factory.parse(dataValue.toString())
                         if (complexObject.attributesArray.isNotEmpty()) {
                             if (complexObject.attributesArray[0].rmAttributeName == CComplexObjectTypes.DEFINING_CODE.type) {
                                 val codePhrase: CCODEPHRASE =
                                     CCODEPHRASE.Factory.parse(complexObject.attributesArray[0].childrenArray[0].toString())
-                                controlBuilder.type(ControlType.INTERNAL_CODED_TEXT.type)
-                                controlBuilder.codeList(codePhrase.codeListArray, section.termDefinitions)
+
+                                val referenceSetQuery =
+                                    codePhrase.selectChildren("http://schemas.openehr.org/v1", "referenceSetUri")
+                                if (referenceSetQuery.isNotEmpty()) {
+                                    val referenceSetUri = (referenceSetQuery[0] as SimpleValue).stringValue
+                                    if (referenceSetUri.contains("ecl")) {
+                                        controlBuilder.type(ControlType.CONSTRAINED_TEXT.type)
+                                        controlBuilder.referenceSetUri(referenceSetUri)
+                                    }
+
+                                    if (referenceSetUri.contains("list")) {
+                                        controlBuilder.type(ControlType.EXTERNAL_CODED_TEXT.type)
+                                        controlBuilder.codeList(referenceSetUri)
+                                    }
+                                }
+
+                                if (codePhrase.codeListArray != null && codePhrase.codeListArray.isNotEmpty()) {
+                                    controlBuilder.type(ControlType.INTERNAL_CODED_TEXT.type)
+                                    controlBuilder.codeList(codePhrase.codeListArray, section.termDefinitions)
+                                }
                             }
                         }
                     }
 
                     CComplexObjectTypes.DV_TEXT.type -> {
                         controlBuilder.type(ControlType.FREE_TEXT.type)
-                        //val dvText: DvText = DVTEXT.Factory.parse(dataValue.toString())
-                        //println(dvText.formatting)
+                    }
+
+                    CComplexObjectTypes.DV_COUNT.type -> {
+                        controlBuilder.type(ControlType.COUNT.type)
+                        val rangeQuery = complexObject.attributesArray[0].childrenArray[0].selectChildren(
+                            "http://schemas.openehr.org/v1",
+                            "item"
+                        )[0].selectChildren("http://schemas.openehr.org/v1", "range")[0]
+                        val interval: IntervalOfInteger = IntervalOfInteger.Factory.parse(rangeQuery.toString())
+                        controlBuilder.range(interval)
+                    }
+
+                    CComplexObjectTypes.DV_DATE_TIME.type -> {
+                        controlBuilder.type(ControlType.DATETIME.type)
+                        val patternQuery = (complexObject.attributesArray[0].childrenArray[0].selectChildren(
+                            "http://schemas.openehr.org/v1",
+                            "item"
+                        )[0].selectChildren("http://schemas.openehr.org/v1", "pattern")[0] as SimpleValue).stringValue
+                        controlBuilder.datePattern = patternQuery
+                    }
+
+                    CComplexObjectTypes.DV_BOOLEAN.type -> {
+                        controlBuilder.type(ControlType.BOOLEAN_CHECK.type)
+                    }
+
+                    CComplexObjectTypes.DV_DURATION.type -> {
+                        controlBuilder.type(ControlType.DURATION.type)
+                        val rangeQuery = complexObject.attributesArray[0].childrenArray[0].selectChildren(
+                            "http://schemas.openehr.org/v1",
+                            "item"
+                        )[0].selectChildren("http://schemas.openehr.org/v1", "range")[0]
+                        val interval: IntervalOfDateTime = IntervalOfDateTime.Factory.parse(rangeQuery.toString())
+                        controlBuilder.range(interval)
                     }
                 }
             }
@@ -238,5 +291,8 @@ class UITemplate(template: File) {
 //}
 
 private fun getChildType(child: COBJECT): String {
-    return (child.selectAttribute("http://www.w3.org/2001/XMLSchema-instance", "type") as SimpleValue).stringValue ?: ""
+    child.selectAttribute("http://www.w3.org/2001/XMLSchema-instance", "type")?.let {
+        return (it as SimpleValue).stringValue
+    }
+    return ""
 }

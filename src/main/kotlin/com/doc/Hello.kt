@@ -7,6 +7,8 @@ import com.google.gson.GsonBuilder
 import openEHR.v1.template.COMPOSITION
 import org.apache.xmlbeans.SimpleValue
 import org.openehr.schemas.v1.*
+import org.openehr.schemas.v1.impl.IntervalOfDateTimeImpl
+import org.openehr.schemas.v1.impl.IntervalOfIntegerImpl
 import java.io.File
 
 var termDescription = mutableMapOf<String, TermDefinition>()
@@ -20,22 +22,20 @@ fun getChildType(child: COBJECT): String {
 }
 
 fun main(args: Array<String>) {
-    val file = File("src/main/resources/soap.opt")
+    val file = File("src/main/resources/test_all_datatypes.opt")
     val uiTemplate = UITemplate(file)
     //println(uiTemplate.sections[0].sections[0].sections.size)
     //println(uiTemplate.sections[0].sections[0].controls.size)
     val gsonBuilder: GsonBuilder = GsonBuilder().setPrettyPrinting()
     gsonBuilder.registerTypeAdapter(IntervalOfInteger::class.java, IntervalOfIntegerAdapter())
+    gsonBuilder.registerTypeAdapter(IntervalOfIntegerImpl::class.java, IntervalOfIntegerImplAdapter())
+    gsonBuilder.registerTypeAdapter(IntervalOfDateTimeImpl::class.java, IntervalOfDateTimeImplAdapter())
     //gsonBuilder.registerTypeAdapter(IntervalOfReal::class.java, IntervalOfRealAdapter())
     gsonBuilder.registerTypeAdapter(CQUANTITYITEM::class.java, CQuantityItemAdapter())
+
     val gson: Gson = gsonBuilder.create()
     println(gson.toJson(uiTemplate))
-    //val base = OPERATIONALTEMPLATE.Factory.parse(file)
-    //println(file.readText())
-    //val baseObject = base.selectChildren("http://schemas.openehr.org/v1", "template")[0]
-    //val opt = OPERATIONALTEMPLATE.Factory.parse(baseObject.toString()) as OPERATIONALTEMPLATEImpl
-    //findDefinitionElements(opt.definition)
-    //println(TermDefinitionsMapper.mapDefinitions(opt.definition))
+
 
 }
 
