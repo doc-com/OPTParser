@@ -1,7 +1,8 @@
 package com.doc.uimodel
 
+import com.doc.CComplexObjectTypes
 import com.doc.TermDefinition
-import com.sun.media.jfxmedia.track.Track
+import org.apache.xmlbeans.SimpleValue
 import org.openehr.schemas.v1.*
 import java.net.URLDecoder
 import java.util.*
@@ -16,10 +17,11 @@ class Control private constructor(
     val orderInParent: Int?,
     val termDefinition: TermDefinition?,
     val type: String?,
+    val formalism: List<String>?,
     val range: Interval?,
-    var datePattern: String?,
+    val datePattern: String?,
     val quantityItems: List<CQUANTITYITEM>?,
-    var ordinalList: List<OrdinalTuple>?,
+    val ordinalList: List<OrdinalTuple>?,
     val codeList: List<String>?,
     val codedItems: List<TerminologyTuple>?,
     val referenceSetUri: TerminologyReference?
@@ -31,6 +33,7 @@ class Control private constructor(
         val orderInParent: Int,
         val term: TermDefinition,
         var type: String? = null,
+        var formalism: List<String>? = null,
         var range: Interval? = null,
         var datePattern: String? = null,
         var quantityItems: List<CQUANTITYITEM>? = null,
@@ -42,10 +45,108 @@ class Control private constructor(
 
         fun type(type: String) = apply { this.type = type }
 
-        fun datePattern(datePattern: String) = apply { this.datePattern = datePattern }
+        fun nullFlavour(nullFlavor: CATTRIBUTE) = apply {
+            val codedText: DVCODEDTEXT
+        }
 
-        fun range(interval: Interval) {
-            this.range = interval
+        fun formalism(complexObject: CCOMPLEXOBJECT) {
+            if (!complexObject.attributesArray.isNullOrEmpty() && !complexObject.attributesArray[0].childrenArray.isNullOrEmpty()) {
+                val strObjectSelect = complexObject.attributesArray[0].childrenArray[0].selectChildren(
+                    "http://schemas.openehr.org/v1",
+                    "item"
+                )
+                if (!strObjectSelect.isNullOrEmpty()) {
+                    val str: CSTRING = CSTRING.Factory.parse(strObjectSelect[0].toString())
+                    this.formalism = str.listArray.toList()
+                }
+            }
+        }
+
+        fun codedText(complexObject: CCOMPLEXOBJECT, section: Section) = apply {
+            if (complexObject.attributesArray.isNotEmpty()) {
+                if (complexObject.attributesArray[0].rmAttributeName == CComplexObjectTypes.DEFINING_CODE.type) {
+                    val codePhrase: CCODEPHRASE =
+                        CCODEPHRASE.Factory.parse(complexObject.attributesArray[0].childrenArray[0].toString())
+
+                    val referenceSetQuery =
+                        codePhrase.selectChildren("http://schemas.openehr.org/v1", "referenceSetUri")
+                    if (referenceSetQuery.isNotEmpty()) {
+                        val referenceSetUri = (referenceSetQuery[0] as SimpleValue).stringValue
+                        if (referenceSetUri.contains("ecl")) {
+                            this.type(ControlType.CONSTRAINED_TEXT.type)
+                            this.referenceSetUri(referenceSetUri)
+                        }
+
+                        if (referenceSetUri.contains("list")) {
+                            this.type(ControlType.EXTERNAL_CODED_TEXT.type)
+                            this.codeList(referenceSetUri)
+                        }
+                    }
+
+                    if (codePhrase.codeListArray != null && codePhrase.codeListArray.isNotEmpty()) {
+                        this.type(ControlType.INTERNAL_CODED_TEXT.type)
+                        this.codeList(codePhrase.codeListArray, section.termDefinitions)
+                    }
+                }
+            }
+        }
+
+        fun datePattern(complexObject: CCOMPLEXOBJECT) = apply {
+            when (complexObject.rmTypeName) {
+                CComplexObjectTypes.DV_DATE_TIME.type -> {
+                    val filter =
+                        complexObject.attributesArray.filter { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == CComplexObjectTypes.VALUE.type }
+                    if (!filter.isNullOrEmpty()) {
+                        val attribute = filter[0]
+                        if (attribute.childrenArray.isNotEmpty()) {
+                            val dateTime: CDATETIME = CDATETIME.Factory.parse(attribute.childrenArray[0].toString())
+                            if (dateTime.isSetPattern) this.datePattern = dateTime.pattern
+                        }
+                    }
+                }
+
+                CComplexObjectTypes.DV_DATE.type -> {
+                    val filter =
+                        complexObject.attributesArray.filter { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == CComplexObjectTypes.VALUE.type }
+                    if (!filter.isNullOrEmpty()) {
+                        val attribute = filter[0]
+                        if (attribute.childrenArray.isNotEmpty()) {
+                            val dateTime: CDATE = CDATE.Factory.parse(attribute.childrenArray[0].toString())
+                            if (dateTime.isSetPattern) this.datePattern = dateTime.pattern
+                        }
+                    }
+                }
+            }
+        }
+
+        fun range(complexObject: CCOMPLEXOBJECT) = apply {
+            when (complexObject.rmTypeName) {
+
+                CComplexObjectTypes.DV_COUNT.type -> {
+                    val filter =
+                        complexObject.attributesArray.filter { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == CComplexObjectTypes.MAGNITUDE.type }
+                    if (!filter.isNullOrEmpty()) {
+                        val attribute = filter[0]
+                        if (attribute.childrenArray.isNotEmpty()) {
+                            val integer: CINTEGER =
+                                CINTEGER.Factory.parse(attribute.childrenArray[0].toString())
+                            if (integer.isSetRange) this.range = integer.range
+                        }
+                    }
+                }
+
+                CComplexObjectTypes.DV_DURATION.type -> {
+                    val filter =
+                        complexObject.attributesArray.filter { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == CComplexObjectTypes.VALUE.type }
+                    if (!filter.isNullOrEmpty()) {
+                        val attribute = filter[0]
+                        if (attribute.childrenArray.isNotEmpty()) {
+                            val duration: CDURATION = CDURATION.Factory.parse(attribute.childrenArray[0].toString())
+                            if (duration.isSetRange) this.range = duration.range
+                        }
+                    }
+                }
+            }
         }
 
         fun quantityItems(quantity: COBJECT) = apply {
@@ -107,6 +208,7 @@ class Control private constructor(
             orderInParent,
             term,
             type,
+            formalism,
             range,
             datePattern,
             quantityItems,

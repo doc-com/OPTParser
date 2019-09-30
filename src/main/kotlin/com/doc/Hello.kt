@@ -22,7 +22,7 @@ fun getChildType(child: COBJECT): String {
 }
 
 fun main(args: Array<String>) {
-    val file = File("src/main/resources/test_all_datatypes.opt")
+    val file = File("src/main/resources/encounter_test.opt")
     val uiTemplate = UITemplate(file)
     //println(uiTemplate.sections[0].sections[0].sections.size)
     //println(uiTemplate.sections[0].sections[0].controls.size)
@@ -35,8 +35,6 @@ fun main(args: Array<String>) {
 
     val gson: Gson = gsonBuilder.create()
     println(gson.toJson(uiTemplate))
-
-
 }
 
 fun findDefinitionElements(root: CARCHETYPEROOT) {
