@@ -1,15 +1,14 @@
 package com.doc.uimodel
 
-import com.doc.CComplexObjectTypes
+import com.doc.*
+import com.google.gson.GsonBuilder
 import org.apache.xmlbeans.SimpleValue
 import org.apache.xmlbeans.XmlObject
-import org.openehr.am.archetype.ontology.ConstraintBinding
-import org.openehr.rm.datatypes.text.DvText
 import org.openehr.schemas.v1.*
-import org.openehr.schemas.v1.impl.CDVORDINALImpl
+import org.openehr.schemas.v1.impl.IntervalOfDateTimeImpl
+import org.openehr.schemas.v1.impl.IntervalOfIntegerImpl
 import org.openehr.schemas.v1.impl.OPERATIONALTEMPLATEImpl
 import java.io.File
-import java.net.URI
 
 class UITemplate(template: File) {
 
@@ -31,6 +30,7 @@ class UITemplate(template: File) {
         sections = mutableListOf()
         viewConstraints = mutableMapOf()
         mapViewConstraints(opt)
+
         create(opt.definition)
     }
 
@@ -285,6 +285,15 @@ class UITemplate(template: File) {
         section.addControl(controlBuilder.build())
     }
 
+    fun toJson(): String {
+        val gsonBuilder: GsonBuilder = GsonBuilder().setPrettyPrinting()
+        gsonBuilder.registerTypeAdapter(IntervalOfInteger::class.java, IntervalOfIntegerAdapter())
+        gsonBuilder.registerTypeAdapter(IntervalOfIntegerImpl::class.java, IntervalOfIntegerImplAdapter())
+        gsonBuilder.registerTypeAdapter(IntervalOfDateTimeImpl::class.java, IntervalOfDateTimeImplAdapter())
+        gsonBuilder.registerTypeAdapter(CQUANTITYITEM::class.java, CQuantityItemAdapter())
+        val gson = gsonBuilder.create()
+        return gson.toJson(this)
+    }
 }
 
 private fun getChildType(child: COBJECT): String {
