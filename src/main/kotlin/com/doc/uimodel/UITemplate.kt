@@ -82,8 +82,16 @@ class UITemplate(template: File) {
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val data: CATTRIBUTE =
                     CATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "data" }.toString())
+
                 val archetypeRoot: CARCHETYPEROOT = CARCHETYPEROOT.Factory.parse(complexObject.toString())
                 processAttribute(data, "[${archetypeRoot.archetypeId.value}]", newSection)
+
+                val protocolArray: List<CATTRIBUTE> =
+                    complexObject.attributesArray.filter { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "protocol" }
+                if (!protocolArray.isNullOrEmpty()) {
+                    val protocol = CATTRIBUTE.Factory.parse(protocolArray[0].toString())
+                    processAttribute(protocol, "[${archetypeRoot.archetypeId.value}]", newSection)
+                }
             }
 
             CComplexObjectTypes.SECTION.type -> {
@@ -112,11 +120,9 @@ class UITemplate(template: File) {
             }
 
             CComplexObjectTypes.ACTIVITY.type -> {
-                val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
-                if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val content: CSINGLEATTRIBUTE =
                     CSINGLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "description" }.toString())
-                processAttribute(content, "$path[${complexObject.nodeId}]", newSection)
+                processAttribute(content, "$path[${complexObject.nodeId}]", currentSection)
             }
 
             CComplexObjectTypes.ACTION.type -> {
@@ -142,14 +148,18 @@ class UITemplate(template: File) {
             }
 
             CComplexObjectTypes.POINT_EVENT.type -> {
+                val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
+                if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 complexObject.attributesArray.forEach {
-                    processAttribute(it, "$path[${complexObject.nodeId}]", currentSection)
+                    processAttribute(it, "$path[${complexObject.nodeId}]", newSection)
                 }
             }
 
             CComplexObjectTypes.EVENT.type -> {
+                val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
+                if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 complexObject.attributesArray.forEach {
-                    processAttribute(it, "$path[${complexObject.nodeId}]", currentSection)
+                    processAttribute(it, "$path[${complexObject.nodeId}]", newSection)
                 }
             }
 

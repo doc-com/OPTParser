@@ -5,7 +5,7 @@ import java.io.File
 
 
 fun main(args: Array<String>) {
-    val file = File("src/main/resources/encounter_test.opt")
+    val file = File("src/main/resources/soap.opt")
     val uiTemplate = UITemplate(file)
     println(uiTemplate.toJson())
 }
