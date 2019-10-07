@@ -35,7 +35,7 @@ class UITemplate(template: File) {
     }
 
     private fun create(definition: CCOMPLEXOBJECT) {
-        processComplexObject(definition, "", 0, null)
+        processComplexObject(definition, "", "/version/data", 0, null)
     }
 
     private fun mapViewConstraints(opt: XmlObject) {
@@ -61,6 +61,7 @@ class UITemplate(template: File) {
     private fun processComplexObject(
         complexObject: CCOMPLEXOBJECT,
         path: String,
+        contributionPath: String,
         orderInParent: Int,
         currentSection: Section?
     ) {
@@ -70,37 +71,84 @@ class UITemplate(template: File) {
 
         when (complexObject.rmTypeName) {
             CComplexObjectTypes.COMPOSITION.type -> {
+                val archetypeRoot: CARCHETYPEROOT = CARCHETYPEROOT.Factory.parse(complexObject.toString())
                 val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
+
                 val content: CMULTIPLEATTRIBUTE =
                     CMULTIPLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "content" }.toString())
-                processAttribute(content, "", newSection)
+
+                var newContributionPath = "$contributionPath[@archetype_node_id='${archetypeRoot.archetypeId.value}']"
+                if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
+                processAttribute(
+                    content,
+                    "",
+                    newContributionPath,
+                    newSection
+                )
             }
 
             CComplexObjectTypes.OBSERVATION.type -> {
+                val archetypeRoot: CARCHETYPEROOT = CARCHETYPEROOT.Factory.parse(complexObject.toString())
                 val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val data: CATTRIBUTE =
                     CATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "data" }.toString())
 
-                val archetypeRoot: CARCHETYPEROOT = CARCHETYPEROOT.Factory.parse(complexObject.toString())
-                processAttribute(data, "[${archetypeRoot.archetypeId.value}]", newSection)
+                var newContributionPath = "$contributionPath[@archetype_node_id='${archetypeRoot.archetypeId.value}']"
+                if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
+
+                processAttribute(
+                    data,
+                    "[${archetypeRoot.archetypeId.value}]",
+                    newContributionPath,
+                    newSection
+                )
 
                 val protocolArray: List<CATTRIBUTE> =
                     complexObject.attributesArray.filter { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "protocol" }
                 if (!protocolArray.isNullOrEmpty()) {
                     val protocol = CATTRIBUTE.Factory.parse(protocolArray[0].toString())
-                    processAttribute(protocol, "[${archetypeRoot.archetypeId.value}]", newSection)
+                    processAttribute(
+                        protocol,
+                        "[${archetypeRoot.archetypeId.value}]",
+                        newContributionPath,
+                        newSection
+                    )
                 }
             }
 
             CComplexObjectTypes.SECTION.type -> {
-                val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
-                if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
-
                 val content: CMULTIPLEATTRIBUTE =
                     CMULTIPLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "items" }.toString())
-                processAttribute(content, "$path[${complexObject.nodeId}]", newSection)
+
+
+                if (getChildType(complexObject) == CComplexObjectTypes.C_ARCHETYPE_ROOT.type) {
+                    val archetypeRoot: CARCHETYPEROOT = CARCHETYPEROOT.Factory.parse(complexObject.toString())
+                    val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
+                    if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
+                    var newContributionPath = "$contributionPath[@archetype_node_id='${archetypeRoot.archetypeId.value}']"
+                    if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
+                    processAttribute(
+                        content,
+                        "$path[${complexObject.nodeId}]",
+                        newContributionPath,
+                        newSection
+                    )
+                }
+
+                if (getChildType(complexObject) == CComplexObjectTypes.C_COMPLEX_OBJECT.type) {
+                    val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
+                    if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
+                    var newContributionPath = "$contributionPath[@archetype_node_id='${complexObject.nodeId}']"
+                    if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
+                    processAttribute(
+                        content,
+                        "$path[${complexObject.nodeId}]",
+                        newContributionPath,
+                        newSection
+                    )
+                }
             }
 
             CComplexObjectTypes.CLUSTER.type -> {
@@ -108,21 +156,42 @@ class UITemplate(template: File) {
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val content: CMULTIPLEATTRIBUTE =
                     CMULTIPLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "items" }.toString())
-                processAttribute(content, "$path[${complexObject.nodeId}]", newSection)
+                var newContributionPath = "$contributionPath[@archetype_node_id='${complexObject.nodeId}']"
+                if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
+                processAttribute(
+                    content,
+                    "$path[${complexObject.nodeId}]",
+                    newContributionPath,
+                    newSection
+                )
             }
 
             CComplexObjectTypes.EVALUATION.type -> {
+
+                val archetypeRoot: CARCHETYPEROOT = CARCHETYPEROOT.Factory.parse(complexObject.toString())
                 val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val content: CSINGLEATTRIBUTE =
                     CSINGLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "data" }.toString())
-                processAttribute(content, "$path[${complexObject.nodeId}]", newSection)
+                var newContributionPath = "$contributionPath[@archetype_node_id='${archetypeRoot.archetypeId.value}']"
+                if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
+                processAttribute(
+                    content,
+                    "$path[${complexObject.nodeId}]",
+                    newContributionPath,
+                    newSection
+                )
             }
 
             CComplexObjectTypes.ACTIVITY.type -> {
                 val content: CSINGLEATTRIBUTE =
                     CSINGLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "description" }.toString())
-                processAttribute(content, "$path[${complexObject.nodeId}]", currentSection)
+                processAttribute(
+                    content,
+                    "$path[${complexObject.nodeId}]",
+                    "$contributionPath[@archetype_node_id='${complexObject.nodeId}']",
+                    currentSection
+                )
             }
 
             CComplexObjectTypes.ACTION.type -> {
@@ -130,75 +199,142 @@ class UITemplate(template: File) {
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val content: CSINGLEATTRIBUTE =
                     CSINGLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "description" }.toString())
-                processAttribute(content, "$path[${complexObject.nodeId}]", newSection)
+                var newContributionPath = "$contributionPath[@archetype_node_id='${complexObject.nodeId}']"
+                if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
+                processAttribute(
+                    content,
+                    "$path[${complexObject.nodeId}]",
+                    newContributionPath,
+                    newSection
+                )
             }
 
             CComplexObjectTypes.INSTRUCTION.type -> {
+                val archetypeRoot: CARCHETYPEROOT = CARCHETYPEROOT.Factory.parse(complexObject.toString())
                 val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
                 val content: CMULTIPLEATTRIBUTE =
                     CMULTIPLEATTRIBUTE.Factory.parse(complexObject.attributesArray.single { cattribute: CATTRIBUTE? -> cattribute?.rmAttributeName == "activities" }.toString())
-                processAttribute(content, "$path[${complexObject.nodeId}]", newSection)
+                var newContributionPath = "$contributionPath[@archetype_node_id='${archetypeRoot.archetypeId.value}']"
+                if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
+                processAttribute(
+                    content,
+                    "$path[${complexObject.nodeId}]",
+                    newContributionPath,
+                    newSection
+                )
             }
 
             CComplexObjectTypes.HISTORY.type -> {
                 complexObject.attributesArray.forEach {
-                    processAttribute(it, "$path[${complexObject.nodeId}]", currentSection)
+                    processAttribute(
+                        it,
+                        "$path[${complexObject.nodeId}]",
+                        "$contributionPath[@archetype_node_id='${complexObject.nodeId}']",
+                        currentSection
+                    )
                 }
             }
 
             CComplexObjectTypes.POINT_EVENT.type -> {
                 val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
+                var newContributionPath = "$contributionPath[@archetype_node_id='${complexObject.nodeId}']"
+                if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
                 complexObject.attributesArray.forEach {
-                    processAttribute(it, "$path[${complexObject.nodeId}]", newSection)
+                    processAttribute(
+                        it,
+                        "$path[${complexObject.nodeId}]",
+                        newContributionPath,
+                        newSection
+                    )
                 }
             }
 
             CComplexObjectTypes.EVENT.type -> {
                 val newSection = Section(complexObject, orderInParent, currentSection?.termDefinitions)
                 if (currentSection == null) sections.add(newSection) else currentSection.addSection(newSection)
+                var newContributionPath = "$contributionPath[@archetype_node_id='${complexObject.nodeId}']"
+                if (complexObject.occurrences.upperUnbounded) newContributionPath = "${newContributionPath}[%index%]"
                 complexObject.attributesArray.forEach {
-                    processAttribute(it, "$path[${complexObject.nodeId}]", newSection)
+                    processAttribute(
+                        it,
+                        "$path[${complexObject.nodeId}]",
+                        newContributionPath,
+                        newSection
+                    )
                 }
             }
 
             CComplexObjectTypes.ITEM_TREE.type -> {
                 complexObject.attributesArray.forEach {
-                    processAttribute(it, "$path[${complexObject.nodeId}]", currentSection)
+                    processAttribute(
+                        it,
+                        "$path[${complexObject.nodeId}]",
+                        "$contributionPath[@archetype_node_id='${complexObject.nodeId}']",
+                        currentSection
+                    )
                 }
             }
 
             CComplexObjectTypes.ITEM_LIST.type -> {
                 complexObject.attributesArray.forEach {
-                    processAttribute(it, "$path[${complexObject.nodeId}]", currentSection)
+                    processAttribute(
+                        it,
+                        "$path[${complexObject.nodeId}]",
+                        "$contributionPath[@archetype_node_id='${complexObject.nodeId}']",
+                        currentSection
+                    )
                 }
             }
 
             CComplexObjectTypes.ITEM_STRUCTURE.type -> {
                 complexObject.attributesArray.forEach {
-                    processAttribute(it, "$path[${complexObject.nodeId}]", currentSection)
+                    processAttribute(
+                        it,
+                        "$path[${complexObject.nodeId}]",
+                        "$contributionPath[@archetype_node_id='${complexObject.nodeId}']",
+                        currentSection
+                    )
                 }
             }
 
             CComplexObjectTypes.ELEMENT.type -> {
-                processElement(complexObject, "$path[${complexObject.nodeId}]", orderInParent, currentSection)
+                processElement(
+                    complexObject,
+                    "$path[${complexObject.nodeId}]",
+                    "$contributionPath[@archetype_node_id='${complexObject.nodeId}']",
+                    orderInParent,
+                    currentSection
+                )
             }
 
         }
     }
 
-    private fun processAttribute(attribute: CATTRIBUTE, path: String, section: Section?) {
+    private fun processAttribute(attribute: CATTRIBUTE, path: String, contributionPath: String, section: Section?) {
         //println(attribute.rmAttributeName)
         var orderInParent = 0
-        attribute.childrenArray.forEach {
-            val complexObject: CCOMPLEXOBJECT = CCOMPLEXOBJECT.Factory.parse(it.toString())
-            processComplexObject(complexObject, "$path/${attribute.rmAttributeName}", orderInParent, section)
+        attribute.childrenArray.forEachIndexed { index, element ->
+            val complexObject: CCOMPLEXOBJECT = CCOMPLEXOBJECT.Factory.parse(element.toString())
+            processComplexObject(
+                complexObject,
+                "$path/${attribute.rmAttributeName}",
+                "$contributionPath/${attribute.rmAttributeName}",
+                orderInParent,
+                section
+            )
             orderInParent++
         }
     }
 
-    private fun processElement(element: CCOMPLEXOBJECT, path: String, orderInParent: Int, section: Section?) {
+    private fun processElement(
+        element: CCOMPLEXOBJECT,
+        path: String,
+        contributionPath: String,
+        orderInParent: Int,
+        section: Section?
+    ) {
         if (element.attributesArray.isNotEmpty()) {
 
             var nullFlavour: CATTRIBUTE? = null
@@ -216,6 +352,7 @@ class UITemplate(template: File) {
                             attr.getChildrenArray(0),
                             element.nodeId,
                             "$path/value",
+                            "$contributionPath/value",
                             orderInParent,
                             section,
                             nullFlavour
@@ -229,13 +366,15 @@ class UITemplate(template: File) {
         dataValue: COBJECT,
         nodeId: String,
         path: String,
+        contributionPath: String,
         orderInParent: Int,
         section: Section?,
         nullFlavour: CATTRIBUTE?
     ) {
         //println(dataValue.rmTypeName)
         //println(path)
-        val controlBuilder = Control.Builder(dataValue, path, orderInParent, section?.getTerm(nodeId, path)!!)
+        val controlBuilder =
+            Control.Builder(dataValue, path, contributionPath, orderInParent, section?.getTerm(nodeId, path)!!)
         when (getChildType(dataValue)) {
 
             CComplexObjectTypes.C_DV_QUANTITY.type -> {

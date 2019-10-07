@@ -10,6 +10,7 @@ import java.util.*
 class Control private constructor(
     val id: String?,
     val path: String?,
+    val contributionPath: String?,
     val rmTypeName: String?,
     val occurrences: IntervalOfInteger?,
     val label: String?,
@@ -30,6 +31,7 @@ class Control private constructor(
     data class Builder(
         val complexObject: COBJECT,
         val path: String,
+        val contributionPath: String?,
         val orderInParent: Int,
         val term: TermDefinition,
         var type: String? = null,
@@ -201,6 +203,7 @@ class Control private constructor(
         fun build() = Control(
             UUID.randomUUID().toString(),
             path,
+            contributionPath,
             complexObject.rmTypeName,
             complexObject.occurrences,
             term.text,
